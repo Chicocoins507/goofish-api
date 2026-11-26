@@ -1,7 +1,7 @@
 import os
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from apify_client import ApifyClient
 
 app = FastAPI()
 
@@ -13,35 +13,34 @@ app.add_middleware(
 )
 
 APIFY_TOKEN = os.getenv("APIFY_TOKEN")
-client = ApifyClient(APIFY_TOKEN)
 
 @app.get("/search")
 async def search_goofish(q: str):
     try:
-        run_input = {
+        # 1. Chamada direta via HTTP para a API da Apify (sem usar a biblioteca client)
+        # Isso evita o erro de 'Run object is not subscriptable'
+        url = f"https://api.apify.com/v2/acts/unitbytes~goofish-xianyu-search-scraper/runs?token={APIFY_TOKEN}"
+        
+        payload = {
             "keyword": q,
             "maxItems": 20,
             "detailLevel": "full",
         }
-
-        # Executa o ator
-        run_obj = client.actor("unitbytes/goofish-xianyu-search-scraper").call(run_input=run_input)
         
-        # FORÇA a conversão do objeto para dicionário para evitar o erro 'not subscriptable'
-        if not isinstance(run_obj, dict):
-            run_data = vars(run_obj)
-        else:
-            run_data = run_obj
-
-        dataset_id = run_data.get("defaultDatasetId")
+        # Inicia a busca
+        response = requests.post(url, json=payload).json()
+        run_id = response.get("data", {}).get("id")
+        dataset_id = response.get("data", {}).get("defaultDatasetId")
 
         if not dataset_id:
-            raise Exception("ID do dataset não encontrado no retorno da API.")
+            raise Exception("Não foi possível iniciar a busca no Goofish.")
 
-        items = list(client.dataset(dataset_id).iterate_items())
+        # 2. Busca os itens do dataset
+        dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={APIFY_TOKEN}"
+        items_response = requests.get(dataset_url).json()
 
         results = []
-        for item in items:
+        for item in items_response:
             results.append({
                 "id": item.get("id"),
                 "title": item.get("title"),
