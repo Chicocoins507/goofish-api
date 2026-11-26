@@ -5,7 +5,6 @@ from apify_client import ApifyClient
 
 app = FastAPI()
 
-# Permite que o seu site converse com o servidor
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -13,22 +12,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# O Token será configurado depois no Render para ficar seguro
 APIFY_TOKEN = os.getenv("APIFY_TOKEN")
 client = ApifyClient(APIFY_TOKEN)
 
 @app.get("/search")
 async def search_goofish(q: str):
     try:
-        # Usa o robô da Apify especializado em buscas do Goofish
         run_input = {
             "keyword": q,
             "maxItems": 20,
             "detailLevel": "full",
         }
 
+        # CORREÇÃO AQUI: Chamamos o actor e pegamos o ID do dataset corretamente
         run = client.actor("unitbytes/goofish-xianyu-search-scraper").call(run_input=run_input)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        
+        # Em versões novas, usamos run['defaultDatasetId'] ou run.default_dataset_id
+        dataset_id = run.get("defaultDatasetId") if isinstance(run, dict) else run["defaultDatasetId"]
+        
+        items = list(client.dataset(dataset_id).iterate_items())
 
         results = []
         for item in items:
@@ -44,4 +46,4 @@ async def search_goofish(q: str):
         return {"status": "success", "data": results}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro técnico: {str(e)}")
