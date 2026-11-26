@@ -25,14 +25,18 @@ async def search_goofish(q: str):
         }
 
         # Executa o ator
-        run = client.actor("unitbytes/goofish-xianyu-search-scraper").call(run_input=run_input)
+        run_obj = client.actor("unitbytes/goofish-xianyu-search-scraper").call(run_input=run_input)
         
-        # A FORMA DEFINITIVA DE PEGAR O DATASET ID:
-        # Se 'run' for um dicionário, usa .get(). Se for objeto, usa getattr()
-        dataset_id = run.get("defaultDatasetId") if hasattr(run, "get") else getattr(run, "defaultDatasetId", None)
+        # FORÇA a conversão do objeto para dicionário para evitar o erro 'not subscriptable'
+        if not isinstance(run_obj, dict):
+            run_data = vars(run_obj)
+        else:
+            run_data = run_obj
+
+        dataset_id = run_data.get("defaultDatasetId")
 
         if not dataset_id:
-            raise Exception("Não foi possível encontrar o ID do dataset nos resultados.")
+            raise Exception("ID do dataset não encontrado no retorno da API.")
 
         items = list(client.dataset(dataset_id).iterate_items())
 
