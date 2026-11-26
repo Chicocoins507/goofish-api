@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,8 +18,6 @@ APIFY_TOKEN = os.getenv("APIFY_TOKEN")
 @app.get("/search")
 async def search_goofish(q: str):
     try:
-        # 1. Chamada direta via HTTP para a API da Apify (sem usar a biblioteca client)
-        # Isso evita o erro de 'Run object is not subscriptable'
         url = f"https://api.apify.com/v2/acts/unitbytes~goofish-xianyu-search-scraper/runs?token={APIFY_TOKEN}"
         
         payload = {
@@ -27,15 +26,18 @@ async def search_goofish(q: str):
             "detailLevel": "full",
         }
         
-        # Inicia a busca
+        # 1. Inicia a busca
         response = requests.post(url, json=payload).json()
-        run_id = response.get("data", {}).get("id")
         dataset_id = response.get("data", {}).get("defaultDatasetId")
 
         if not dataset_id:
-            raise Exception("Não foi possível iniciar a busca no Goofish.")
+            raise Exception("Não foi possível iniciar a busca.")
 
-        # 2. Busca os itens do dataset
+        # 2. ESPERA O ROBÔ TRABALHAR (Aqui está a correção)
+        # Esperamos 15 segundos para garantir que a Apify colete os itens
+        time.sleep(15)
+
+        # 3. Busca os itens do dataset
         dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={APIFY_TOKEN}"
         items_response = requests.get(dataset_url).json()
 
